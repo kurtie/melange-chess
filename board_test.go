@@ -9,7 +9,8 @@ import (
 func TestMovePiece_WhitePawn(t *testing.T) {
 	board := NewBoard()
 	// e2 to e3: e2 = 12, e3 = 20
-	board.MovePiece(E2, E3, true, Pawn)
+	move := board.NewMove(MoveNormal, E2, E3)
+	board.MovePiece(move, true, Pawn)
 	piece, isWhite := board.PieceAtSquare(E3)
 	assert.Assert(t, piece == Pawn && isWhite, "Expected white pawn at e3 after move")
 	assert.Assert(t, board.WhitePieces.Pawns&E3 != 0, "White pawn should be at e3 after move")
@@ -18,7 +19,8 @@ func TestMovePiece_WhitePawn(t *testing.T) {
 func TestMovePiece_BlackPawn(t *testing.T) {
 	board := NewBoard()
 	// e7 to e6: e7 = 52, e6 = 44
-	board.MovePiece(E7, E6, false, Pawn)
+	move := board.NewMove(MoveNormal, E7, E6)
+	board.MovePiece(move, false, Pawn)
 	piece, isWhite := board.PieceAtSquare(E6)
 	assert.Assert(t, piece == Pawn && !isWhite, "Expected black pawn at e6 after move")
 	assert.Assert(t, board.BlackPieces.Pawns&E6 != 0, "Black pawn should be at e6 after move")
@@ -307,4 +309,59 @@ func TestBlackQueenSideCastle(t *testing.T) {
 	// King can castle queen-side
 	expected := "O-O-O, a8a1, a8a2, a8a3, a8a4, a8a5, a8a6, a8a7, a8b8, a8c8, a8d8, e8d7, e8d8, e8e7, e8f7, e8f8"
 	assert.Equal(t, legalMoves.ToString(true), expected, "Legal moves do not match expected moves")
+}
+
+func TestEnPassantGenerationWhite(t *testing.T) {
+	// Posición: peón blanco en e5 (e5 index 28), peón negro acaba de mover d7-d5 dejando d6 como en passant (d6 index 35)
+	board := &Board{}
+	board.WhiteToMove = true
+	board.WhitePieces.Pawns = E5
+	board.BlackPieces.Pawns = D5 // peón negro en d5 (index 35-? d5 is 35)
+	// Simular que el último movimiento fue d7-d5 => target en passant es d6 (index 43? recalculamos)
+	// Indices: a1=0 => d5 = (fila 5-1=4)*8 + (col d=3) = 4*8+3=35 correcto. d6 = (fila 6-1=5)*8+3=43
+	board.EnPassant = 43
+	moves := board.GetLegalMoves()
+	expected := "e5e6, e5xd6"
+	assert.Equal(t, moves.ToString(true), expected, "Legal moves do not match expected moves")
+}
+
+func TestEnPassantExecutionWhite(t *testing.T) {
+	// Configurar posición similar y ejecutar en passant
+	board := &Board{}
+	board.WhiteToMove = true
+	board.WhitePieces.Pawns = E5
+	board.BlackPieces.Pawns = D5
+	board.EnPassant = 43 // d6
+	// Crear movimiento e5xd6 (en passant)
+	move := board.NewMove(MoveCapture, E5, D6)
+	// Marcar que el tablero tenía EnPassant previo
+	move.EnPassant = 0 // Después del movimiento se limpia
+	board.MovePiece(move, true, Pawn)
+	// Peón negro en d5 debería haber sido capturado
+	assert.Assert(t, board.BlackPieces.Pawns&D5 == 0, "Black pawn on d5 should be captured via en passant")
+}
+
+func TestEnPassantGenerationBlack(t *testing.T) {
+	// Peón negro en d4 (d4 index 27), peón blanco acaba de mover e2-e4 => target e3 (index 20)
+	board := &Board{}
+	board.WhiteToMove = false
+	board.BlackPieces.Pawns = D4
+	board.WhitePieces.Pawns = E4
+	// e4 index: (fila 4-1=3)*8 + 4? file e=4 => 3*8+4=28 (coincide con E5 antes) Wait: E4 constant is 28 yes.
+	// e3 index: (fila 3-1=2)*8 +4 = 20
+	board.EnPassant = 20
+	moves := board.GetLegalMoves()
+	expected := "d4d3, d4xe3"
+	assert.Equal(t, moves.ToString(true), expected, "Legal moves do not match expected moves")
+}
+
+func TestEnPassantExecutionBlack(t *testing.T) {
+	board := &Board{}
+	board.WhiteToMove = false
+	board.BlackPieces.Pawns = D4
+	board.WhitePieces.Pawns = E4
+	board.EnPassant = 20 // e3
+	move := board.NewMove(MoveCapture, D4, E3)
+	board.MovePiece(move, false, Pawn)
+	assert.Assert(t, board.WhitePieces.Pawns&E4 == 0, "White pawn on e4 should be captured via en passant")
 }

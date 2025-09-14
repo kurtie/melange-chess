@@ -141,11 +141,23 @@ const (
 )
 
 type Move struct {
-	From      int8
-	To        int8
+	From      uint8
+	To        uint8
 	Type      MoveType
 	Castling  CastleRights
 	EnPassant uint8
+}
+
+func (m *Move) GetFrom64() uint64 {
+	return uint64(1) << m.From
+}
+
+func (m *Move) GetTo64() uint64 {
+	return uint64(1) << m.To
+}
+
+func (m *Move) IsCapture() bool {
+	return (m.Type & MoveCapture) != 0
 }
 
 func (m *Move) ToString() string {
@@ -196,7 +208,13 @@ func (m *Move) ToString() string {
 }
 
 // squareToString convierte un índice de 0-63 a notación tipo A1, C3, etc.
-func squareToString(idx int8) string {
+func squareToString(idx uint8) string {
+	// for i := uint64(0); i < 64; i++ {
+	// 	if (idx & (1 << i)) != 0 {
+	// 		idx = i
+	// 		break
+	// 	}
+	// }
 	file := idx % 8
 	rank := (idx / 8)
 	return fmt.Sprintf("%c%d", 'a'+file, rank+1)

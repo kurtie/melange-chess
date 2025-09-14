@@ -2,45 +2,28 @@ package main
 
 import (
 	"fmt"
-	"zentense/muabdib"
+	m "zentense/muabdib"
 )
 
 func main() {
 
-	board := muabdib.NewBoard()
-	// board.WhiteToMove = false
+	board := m.NewBoard()
+	// board.WhiteToMove = true
+	// board.MovePiece(board.NewMove(m.MoveNormal, m.E2, m.E4), true, m.Pawn)
+	// board.MovePiece(board.NewMove(m.MoveNormal, m.D7, m.D5), false, m.Pawn)
+	// board.MovePiece(board.NewMove(m.MoveNormal, m.F1, m.B5), true, m.Bishop)
+	board.SetFen("rnbqkbnr/ppp1pppp/8/1B1p4/4P3/8/PPPP1PPP/RNBQK1NR w KQkq - 0 1")
+	fmt.Println(board.ToString())
+	fmt.Println(board.SquareAttacked(7, 4, true)) // e1
+
+	board.SetFen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1")
 	fmt.Println(board.ToString())
 	return
-	// legalMoves := board.GetLegalMoves()
-	// for _, move := range legalMoves {
-	// 	fmt.Println(move.ToString())
-	// }
-	// fmt.Println("Total legal moves:", len(legalMoves))
 
-	board = &muabdib.Board{}
-	board.WhiteToMove = true
-	board.WhitePieces.King = (uint64(1) << 36)  // King on g5
-	board.BlackPieces.Rooks = (uint64(1) << 37) // Bishop on g6
-	board.WhitePieces.Pawns = (uint64(1) << 35) // Pawn on g4
-	fmt.Println(board.ToString())
-	legalMoves := board.GetLegalMoves()
-	for _, move := range legalMoves {
-		fmt.Println(move.ToString())
-	}
-	fmt.Println("Total legal moves:", len(legalMoves))
-
-	// board = &muabdib.Board{
-	// 	WhitePieces: muabdib.Pieces{
-	// 		Pawns: uint64(0x0000000800000000),
-	// 		King:  uint64(0x0000001000000000),
-	// 	},
-	// 	BlackPieces: muabdib.Pieces{
-	// 		Pawns: uint64(0x0000002000000000),
-	// 	},
-	// 	WhiteToMove: true,
-	// }
-	// println(board.ToString())
-	// println("Attacked E4:", board.SquareAttacked(3, 4, false))
-	// println("Attacked E4:", board.SquareAttacked(3, 5, false))
-	// println("Attacked E4:", board.SquareAttacked(3, 6, false))
+	res := m.Perft(board, 2)
+	fmt.Println("Perft results at depth 2:")
+	fmt.Printf("Nodes: %d\n", res.Nodes)
+	fmt.Printf("Captures: %d\n", res.Captures)
+	fmt.Printf("En Passants: %d\n", res.EnPassants)
+	fmt.Printf("Checks: %d\n", res.Checks)
 }

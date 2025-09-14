@@ -3,6 +3,7 @@ package muabdib
 import (
 	"fmt"
 	"math"
+	"math/bits"
 )
 
 type Board struct {
@@ -53,13 +54,14 @@ func (b *Board) Clone() *Board {
 	}
 }
 
-func (b *Board) GetMove(t MoveType, from int8, to int8) Move {
+func (b *Board) NewMove(t MoveType, from uint64, to uint64) Move {
 	return Move{
-		From:      from,
-		To:        to,
-		Type:      t,
-		Castling:  b.Castling,
-		EnPassant: b.EnPassant,
+		From:     uint8(bits.TrailingZeros64(from)),
+		To:       uint8(bits.TrailingZeros64(to)),
+		Type:     t,
+		Castling: b.Castling,
+		// EnPassant siempre inicia en 0; solo los dobles avances de peón lo establecerán
+		EnPassant: 0,
 	}
 }
 
@@ -107,7 +109,7 @@ func (b *Board) GetPiecesToMove() *Pieces {
 	return &b.BlackPieces
 }
 
-func (b *Board) MovePiece(from, to uint64, isWhite bool, pieceType Piece) {
+func (b *Board) MovePiece(move Move, isWhite bool, pieceType Piece) {
 	var pieces *Pieces
 	if isWhite {
 		pieces = &b.WhitePieces
@@ -115,27 +117,59 @@ func (b *Board) MovePiece(from, to uint64, isWhite bool, pieceType Piece) {
 		pieces = &b.BlackPieces
 	}
 
-	switch pieceType {
-	case Pawn:
-		pieces.Pawns &= ^from
-		pieces.Pawns |= to
-	case Knight:
-		pieces.Knights &= ^from
-		pieces.Knights |= to
-	case Bishop:
-		pieces.Bishops &= ^from
-		pieces.Bishops |= to
-	case Rook:
-		pieces.Rooks &= ^from
-		pieces.Rooks |= to
-	case Queen:
-		pieces.Queens &= ^from
-		pieces.Queens |= to
-	case King:
-		pieces.King &= ^from
-		pieces.King |= to
+	// Detectar captura en passant antes de mover la pieza: si es captura de peón a casilla EnPassant previa y
+	// la casilla destino está vacía
+	if pieceType == Pawn && move.Type == MoveCapture {
+		destBit := move.GetTo64()
+		// La casilla EnPassant válida es la almacenada actualmente en el tablero (del movimiento previo del rival)
+		if b.EnPassant == move.To && !b.IsSquareOccupied(destBit) { // casilla destino vacía => en passant
+			if isWhite {
+				// Captura peón negro que está justo detrás (una fila abajo en términos de bitboard: destino >> 8)
+				captured := destBit >> 8
+				b.CapturePiece(captured, false)
+			} else {
+				// Captura peón blanco que está justo detrás (una fila arriba: destino << 8)
+				captured := destBit << 8
+				b.CapturePiece(captured, true)
+			}
+		}
 	}
 
+	switch pieceType {
+	case Pawn:
+		pieces.Pawns &= ^move.GetFrom64()
+		pieces.Pawns |= move.GetTo64()
+	case Knight:
+		pieces.Knights &= ^move.GetFrom64()
+		pieces.Knights |= move.GetTo64()
+	case Bishop:
+		pieces.Bishops &= ^move.GetFrom64()
+		pieces.Bishops |= move.GetTo64()
+	case Rook:
+		pieces.Rooks &= ^move.GetFrom64()
+		pieces.Rooks |= move.GetTo64()
+	case Queen:
+		pieces.Queens &= ^move.GetFrom64()
+		pieces.Queens |= move.GetTo64()
+	case King:
+		pieces.King &= ^move.GetFrom64()
+		pieces.King |= move.GetTo64()
+	}
+
+	b.Castling = move.Castling
+	// Si el movimiento es un doble avance de peón establecer EnPassant, si no limpiarlo
+	if pieceType == Pawn {
+		// Un doble avance se reconoce porque la diferencia de índices es 16 (dos filas) y no es captura
+		if (move.Type&MoveCapture) == 0 && (move.From+16 == move.To || move.From == move.To+16) {
+			// Casilla intermedia = (from+to)/2
+			mid := (uint16(move.From) + uint16(move.To)) / 2
+			b.EnPassant = uint8(mid)
+		} else {
+			b.EnPassant = 0
+		}
+	} else {
+		b.EnPassant = 0
+	}
 	b.WhiteToMove = !b.WhiteToMove
 }
 
@@ -277,9 +311,8 @@ func (b *Board) GetLegalMoves() MoveList {
 				if row < 7 {
 					to := square << 8
 					if !b.IsSquareOccupied(to) {
-						// move := b.Clone()
-						// move.MovePiece(square, to, true, Pawn)
-						move := b.GetMove(MoveNormal, i, i+8)
+						move := b.NewMove(MoveNormal, square, to)
+						move.EnPassant = 0
 						legalMoves.Add(move)
 					}
 				}
@@ -287,9 +320,9 @@ func (b *Board) GetLegalMoves() MoveList {
 				if row == 1 {
 					to := square << 16
 					if !b.IsSquareOccupied(to) && !b.IsSquareOccupied(square<<8) {
-						// move := b.Clone()
-						// move.MovePiece(square, to, true, Pawn)
-						move := b.GetMove(MoveNormal, i, i+16)
+						move := b.NewMove(MoveNormal, square, to)
+						// En passant target = casilla intermedia
+						move.EnPassant = uint8(bits.TrailingZeros64(square << 8))
 						legalMoves.Add(move)
 					}
 				}
@@ -297,10 +330,10 @@ func (b *Board) GetLegalMoves() MoveList {
 				if row < 7 && col < 7 {
 					to := square << 9
 					if b.IsSquareOccupiedByBlack(to) {
-						// move := b.Clone()
-						// move.CapturePiece(to, false)
-						// move.MovePiece(square, to, true, Pawn)
-						move := b.GetMove(MoveCapture, i, i+9)
+						move := b.NewMove(MoveCapture, square, to)
+						legalMoves.Add(move)
+					} else if b.EnPassant != 0 && to == (uint64(1)<<b.EnPassant) { // en passant derecha
+						move := b.NewMove(MoveCapture, square, to)
 						legalMoves.Add(move)
 					}
 				}
@@ -308,10 +341,10 @@ func (b *Board) GetLegalMoves() MoveList {
 				if row < 7 && col > 0 {
 					to := square << 7
 					if b.IsSquareOccupiedByBlack(to) {
-						// move := b.Clone()
-						// move.CapturePiece(to, false)
-						// move.MovePiece(square, to, true, Pawn)
-						move := b.GetMove(MoveCapture, i, i+7)
+						move := b.NewMove(MoveCapture, square, to)
+						legalMoves.Add(move)
+					} else if b.EnPassant != 0 && to == (uint64(1)<<b.EnPassant) { // en passant izquierda
+						move := b.NewMove(MoveCapture, square, to)
 						legalMoves.Add(move)
 					}
 				}
@@ -321,9 +354,8 @@ func (b *Board) GetLegalMoves() MoveList {
 				if row > 0 {
 					to := square >> 8
 					if !b.IsSquareOccupied(to) {
-						// move := b.Clone()
-						// move.MovePiece(square, to, false, Pawn)
-						move := b.GetMove(MoveNormal, i, i-8)
+						move := b.NewMove(MoveNormal, square, to)
+						move.EnPassant = 0
 						legalMoves.Add(move)
 					}
 				}
@@ -331,9 +363,8 @@ func (b *Board) GetLegalMoves() MoveList {
 				if row == 6 {
 					to := square >> 16
 					if !b.IsSquareOccupied(to) && !b.IsSquareOccupied(square>>8) {
-						// move := b.Clone()
-						// move.MovePiece(square, to, false, Pawn)
-						move := b.GetMove(MoveNormal, i, i-16)
+						move := b.NewMove(MoveNormal, square, to)
+						move.EnPassant = uint8(bits.TrailingZeros64(square >> 8))
 						legalMoves.Add(move)
 					}
 				}
@@ -341,10 +372,10 @@ func (b *Board) GetLegalMoves() MoveList {
 				if row > 0 && col < 7 {
 					to := square >> 7
 					if b.IsSquareOccupiedByWhite(to) {
-						// move := b.Clone()
-						// move.CapturePiece(to, true)
-						// move.MovePiece(square, to, false, Pawn)
-						move := b.GetMove(MoveCapture, i, i-7)
+						move := b.NewMove(MoveCapture, square, to)
+						legalMoves.Add(move)
+					} else if b.EnPassant != 0 && to == (uint64(1)<<b.EnPassant) { // en passant derecha (desde negras)
+						move := b.NewMove(MoveCapture, square, to)
 						legalMoves.Add(move)
 					}
 				}
@@ -352,10 +383,10 @@ func (b *Board) GetLegalMoves() MoveList {
 				if row > 0 && col > 0 {
 					to := square >> 9
 					if b.IsSquareOccupiedByWhite(to) {
-						// move := b.Clone()
-						// move.CapturePiece(to, true)
-						// move.MovePiece(square, to, false, Pawn)
-						move := b.GetMove(MoveCapture, i, i-9)
+						move := b.NewMove(MoveCapture, square, to)
+						legalMoves.Add(move)
+					} else if b.EnPassant != 0 && to == (uint64(1)<<b.EnPassant) { // en passant izquierda (desde negras)
+						move := b.NewMove(MoveCapture, square, to)
 						legalMoves.Add(move)
 					}
 				}
@@ -376,7 +407,7 @@ func (b *Board) GetLegalMoves() MoveList {
 					moveForbidden := (isWhite && occupiedByWhite) || (!isWhite && occupiedByBlack)
 					if !moveForbidden {
 						// move := b.Clone()
-						move := b.GetMove(MoveNormal, i, toIndex)
+						move := b.NewMove(MoveNormal, square, to)
 						if (isWhite && occupiedByBlack) || (!isWhite && occupiedByWhite) {
 							// move.CapturePiece(to, !isWhite)
 							move.Type = MoveCapture
@@ -393,11 +424,40 @@ func (b *Board) GetLegalMoves() MoveList {
 				legalMoves.Append(dirMoves)
 			}
 		case Rook:
+			rookMoves := []Move{}
 			// Movimientos en las 4 direcciones: N, S, E, O
 			for _, dir := range dirStraight {
 				dirMoves := getLegalMovesInOneDirection(b, row, col, square, dir, isWhite)
-				legalMoves = append(legalMoves, dirMoves...)
+				rookMoves = append(rookMoves, dirMoves...)
 			}
+
+			if isWhite {
+				// Update white castling rights
+				if square == A1 && (b.Castling&WhiteQueenSide != 0) {
+					// Update castling rights for rook moves from original squares only if rights are set
+					for i := range rookMoves {
+						rookMoves[i].Castling &^= WhiteQueenSide
+					}
+				} else if square == H1 && (b.Castling&WhiteKingSide != 0) {
+					for i := range rookMoves {
+						rookMoves[i].Castling &^= WhiteKingSide
+					}
+				}
+			} else {
+				// Update black castling rights
+				if square == A8 && (b.Castling&BlackQueenSide != 0) {
+					// Update castling rights for rook moves from original squares only if rights are set
+					for i := range rookMoves {
+						rookMoves[i].Castling &^= BlackQueenSide
+					}
+				} else if square == H8 && (b.Castling&BlackKingSide != 0) {
+					for i := range rookMoves {
+						rookMoves[i].Castling &^= BlackKingSide
+					}
+				}
+			}
+
+			legalMoves = append(legalMoves, rookMoves...)
 		case Queen:
 			// Movimientos en las 8 direcciones: N, S, E, O, NE, NO, SE, SO
 			for _, dir := range dirAll {
@@ -419,7 +479,13 @@ func (b *Board) GetLegalMoves() MoveList {
 						b.SquareAttacked(r, c, isWhite)
 					if !moveForbidden {
 						// move := b.Clone()
-						move := b.GetMove(MoveNormal, i, toIndex)
+						move := b.NewMove(MoveNormal, square, to)
+						// Update castling rights
+						if isWhite {
+							move.Castling &^= WhiteKingSide | WhiteQueenSide
+						} else {
+							move.Castling &^= BlackKingSide | BlackQueenSide
+						}
 						if (isWhite && occupiedByBlack) || (!isWhite && occupiedByWhite) {
 							// move.CapturePiece(to, !isWhite)
 							move.Type = MoveCapture
@@ -439,7 +505,7 @@ func (b *Board) GetLegalMoves() MoveList {
 						!b.SquareAttacked(0, 4, true) &&
 						!b.SquareAttacked(0, 5, true) &&
 						!b.SquareAttacked(0, 6, true) {
-						move := b.GetMove(MoveKingCastle, i, 6)
+						move := b.NewMove(MoveKingCastle, square, G1)
 						legalMoves = append(legalMoves, move)
 					}
 					// White queen-side castling
@@ -448,7 +514,7 @@ func (b *Board) GetLegalMoves() MoveList {
 						!b.SquareAttacked(0, 4, true) &&
 						!b.SquareAttacked(0, 3, true) &&
 						!b.SquareAttacked(0, 2, true) {
-						move := b.GetMove(MoveQueenCastle, i, 2)
+						move := b.NewMove(MoveQueenCastle, square, C1)
 						legalMoves = append(legalMoves, move)
 					}
 				}
@@ -460,7 +526,7 @@ func (b *Board) GetLegalMoves() MoveList {
 					!b.SquareAttacked(7, 4, false) &&
 					!b.SquareAttacked(7, 5, false) &&
 					!b.SquareAttacked(7, 6, false) {
-					move := b.GetMove(MoveKingCastle, i, 62)
+					move := b.NewMove(MoveKingCastle, square, G8)
 					legalMoves = append(legalMoves, move)
 				}
 				// Black queen-side castling
@@ -469,7 +535,7 @@ func (b *Board) GetLegalMoves() MoveList {
 					!b.SquareAttacked(7, 4, false) &&
 					!b.SquareAttacked(7, 3, false) &&
 					!b.SquareAttacked(7, 2, false) {
-					move := b.GetMove(MoveQueenCastle, i, 58)
+					move := b.NewMove(MoveQueenCastle, square, C8)
 					legalMoves = append(legalMoves, move)
 				}
 
@@ -509,7 +575,7 @@ var dirAll = []Direction{
 // getLegalMovesInOneDirection generates legal moves for sliding pieces (Bishop, Rook, Queen) in a given direction.
 func getLegalMovesInOneDirection(b *Board, r int8, c int8, square uint64, dir Direction, isWhite bool) []Move {
 	var legalMoves []Move
-	from := r*8 + c
+	// from := r*8 + c
 	for {
 		r += dir.dr
 		c += dir.dc
@@ -526,14 +592,14 @@ func getLegalMovesInOneDirection(b *Board, r int8, c int8, square uint64, dir Di
 				// move := b.Clone()
 				// move.CapturePiece(to, whiteCapture)
 				// move.MovePiece(square, to, isWhite, piece)
-				move := b.GetMove(MoveCapture, from, toIndex)
+				move := b.NewMove(MoveCapture, square, to)
 				legalMoves = append(legalMoves, move)
 			}
 			break // No puede saltar piezas
 		} else {
 			// move := b.Clone()
 			// move.MovePiece(square, to, isWhite, piece)
-			move := b.GetMove(MoveNormal, from, toIndex)
+			move := b.NewMove(MoveNormal, square, to)
 			legalMoves = append(legalMoves, move)
 		}
 	}
@@ -544,6 +610,11 @@ func getLegalMovesInOneDirection(b *Board, r int8, c int8, square uint64, dir Di
 // isWhite is the color of the player whose king is being checked (i.e., isWhite=true means check if black attacks).
 // row and col are 0-indexed (0-7).
 func (b *Board) SquareAttacked(row, col int8, isWhite bool) bool {
+	// fmt.Println("Checking attack on square:", row, col, "isWhite:", isWhite)
+	// if row == 0 && col == 4 && !isWhite {
+	// 	fmt.Println("Check bug")
+	// 	fmt.Println(b.ToString())
+	// }
 	var opponentPieces *Pieces
 	if isWhite {
 		opponentPieces = &b.BlackPieces
