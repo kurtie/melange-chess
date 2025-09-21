@@ -4,10 +4,12 @@ import (
 	"math/bits"
 )
 
+var PerftMoveMap = make(map[Move]PerftResult)
+
 // Perft recursively counts the number of leaf nodes reachable within a given depth.
 // It generates only legal moves (i.e. moves that do not leave the moving side in check).
 // depth == 1 returns the number of legal moves in the current position.
-func (b *Board) Perft(depth int) PerftResult {
+func (b *Board) Perft(depth int, start bool) PerftResult {
 	if depth == 0 {
 		return PerftResult{Nodes: 1}
 	}
@@ -32,7 +34,7 @@ func (b *Board) Perft(depth int) PerftResult {
 						}
 					}
 				}
-				// Detect check
+				// Detectar jaques
 				state := b.perftMakeMove(m)
 				// Tras hacer el movimiento, WhiteToMove indica el lado que debe responder.
 				// Si el rey de ese lado está siendo atacado, el movimiento ha dado jaque.
@@ -52,6 +54,21 @@ func (b *Board) Perft(depth int) PerftResult {
 					}
 				}
 				b.unmakeMove(state)
+
+				// Detectar promociones
+				fromBB := m.GetFrom64()
+				piece, _ := b.PieceAtSquare(fromBB)
+				if piece == Pawn {
+					toBB := m.GetTo64()
+					toSq := uint8(bits.TrailingZeros64(toBB))
+					toRow := toSq / 8
+					if toRow == 0 || toRow == 7 {
+						res.Promotions++
+					}
+				}
+				if m.Type == MoveKingCastle || m.Type == MoveQueenCastle {
+					res.Castles++
+				}
 			}
 		}
 		return res
@@ -62,9 +79,13 @@ func (b *Board) Perft(depth int) PerftResult {
 		}
 		// Clone here is slover, so we use make/unmake
 		state := b.perftMakeMove(m)
-		deeperRes := b.Perft(depth - 1)
+		deeperRes := b.Perft(depth-1, false)
 		res.Add(deeperRes)
 		b.unmakeMove(state)
+
+		if start {
+			PerftMoveMap[m] = deeperRes
+		}
 
 		// copy := b.Clone()
 		// copy.perftMakeMove(m)
@@ -79,6 +100,8 @@ type PerftResult struct {
 	Nodes      int
 	Captures   int
 	EnPassants int
+	Castles    int
+	Promotions int
 	Checks     int
 }
 
@@ -86,12 +109,14 @@ func (r *PerftResult) Add(other PerftResult) {
 	r.Nodes += other.Nodes
 	r.Captures += other.Captures
 	r.EnPassants += other.EnPassants
+	r.Castles += other.Castles
+	r.Promotions += other.Promotions
 	r.Checks += other.Checks
 }
 
 // Perft helper for tests keeping previous API style.
 func Perft(board *Board, depth int) PerftResult {
-	return board.Perft(depth)
+	return board.Perft(depth, true)
 }
 
 // moveState stores the information needed to undo a move quickly.

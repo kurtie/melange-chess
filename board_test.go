@@ -365,3 +365,28 @@ func TestEnPassantExecutionBlack(t *testing.T) {
 	board.MovePiece(move, false, Pawn)
 	assert.Assert(t, board.WhitePieces.Pawns&E4 == 0, "White pawn on e4 should be captured via en passant")
 }
+
+func TestWhitePromotionGeneration(t *testing.T) {
+	board := &Board{}
+	board.WhiteToMove = true
+	// White pawn on a7 (ready to promote), and black piece on b8 to allow capture promotion
+	board.WhitePieces.Pawns = A7
+	board.BlackPieces.Knights = B8
+	moves := board.GetLegalMoves()
+	// From a7 -> a8 promotions (4) and a7xb8 promotions (4); sort expected lexicographically
+	expectedSlice := []string{"a7a8=B", "a7a8=N", "a7a8=Q", "a7a8=R", "a7xb8=B", "a7xb8=N", "a7xb8=Q", "a7xb8=R"}
+	got := moves.ToStringArraySorted()
+	assert.DeepEqual(t, got, expectedSlice)
+}
+
+func TestBlackPromotionGeneration(t *testing.T) {
+	board := &Board{}
+	board.WhiteToMove = false
+	// Black pawn on h2 (index 15) ready to promote moving to h1, white piece on g1 for capture promotions
+	board.BlackPieces.Pawns = H2
+	board.WhitePieces.Knights = G1
+	moves := board.GetLegalMoves()
+	expectedSlice := []string{"h2h1=B", "h2h1=N", "h2h1=Q", "h2h1=R", "h2xg1=B", "h2xg1=N", "h2xg1=Q", "h2xg1=R"}
+	got := moves.ToStringArraySorted()
+	assert.DeepEqual(t, got, expectedSlice)
+}

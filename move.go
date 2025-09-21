@@ -160,6 +160,29 @@ func (m *Move) IsCapture() bool {
 	return (m.Type & MoveCapture) != 0
 }
 
+func (m *Move) ToSimpleString() string {
+	return fmt.Sprintf("%s%s", squareToString(m.From), squareToString(m.To))
+}
+
+// Update castling rights when rook is captured
+func (m *Move) CheckCapturedRook(isWhite bool, destBit uint64, b *Board) {
+	if isWhite && b.BlackPieces.Rooks&destBit != 0 {
+		switch destBit {
+		case A8:
+			m.Castling &^= BlackQueenSide
+		case H8:
+			m.Castling &^= BlackKingSide
+		}
+	} else if !isWhite && b.WhitePieces.Rooks&destBit != 0 {
+		switch destBit {
+		case A1:
+			m.Castling &^= WhiteQueenSide
+		case H1:
+			m.Castling &^= WhiteKingSide
+		}
+	}
+}
+
 func (m *Move) ToString() string {
 	from := squareToString(m.From)
 	to := squareToString(m.To)
