@@ -5,3 +5,5 @@ Muabdib Chess Engine is an open-source chess engine written in Go. This is my si
 Muabdib uses a bitboard chess representation.
 
 The project is in a very early stage. So far, only the chess movement rules have been implemented. Its correctness has been validated using Stockfish's perft.
+
+A very simple evaluation function is a work in progress.

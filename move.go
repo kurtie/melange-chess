@@ -2,6 +2,7 @@ package muabdib
 
 import (
 	"fmt"
+	"math/bits"
 	"sort"
 	"strings"
 )
@@ -72,6 +73,15 @@ const (
 	G8 uint64 = 1 << 62
 	H8 uint64 = 1 << 63
 )
+
+func toIdx(square uint64) int {
+	return bits.TrailingZeros64(square)
+}
+
+// Like toIdx but symmetric (A1=63, H8=0)
+func toIdxSym(square uint64) int {
+	return 63 - bits.TrailingZeros64(square)
+}
 
 type Piece int
 
