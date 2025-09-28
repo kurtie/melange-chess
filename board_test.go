@@ -9,8 +9,8 @@ import (
 func TestMovePiece_WhitePawn(t *testing.T) {
 	board := NewBoard()
 	// e2 to e3: e2 = 12, e3 = 20
-	move := board.NewMove(MoveNormal, E2, E3)
-	board.MovePiece(move, true, Pawn)
+	move := board.NewMove(MoveNormal, E2, E3, Pawn)
+	board.MovePiece(move, true)
 	piece, isWhite := board.PieceAtSquare(E3)
 	assert.Assert(t, piece == Pawn && isWhite, "Expected white pawn at e3 after move")
 	assert.Assert(t, board.WhitePieces.Pawns&E3 != 0, "White pawn should be at e3 after move")
@@ -19,8 +19,8 @@ func TestMovePiece_WhitePawn(t *testing.T) {
 func TestMovePiece_BlackPawn(t *testing.T) {
 	board := NewBoard()
 	// e7 to e6: e7 = 52, e6 = 44
-	move := board.NewMove(MoveNormal, E7, E6)
-	board.MovePiece(move, false, Pawn)
+	move := board.NewMove(MoveNormal, E7, E6, Pawn)
+	board.MovePiece(move, false)
 	piece, isWhite := board.PieceAtSquare(E6)
 	assert.Assert(t, piece == Pawn && !isWhite, "Expected black pawn at e6 after move")
 	assert.Assert(t, board.BlackPieces.Pawns&E6 != 0, "Black pawn should be at e6 after move")
@@ -333,10 +333,10 @@ func TestEnPassantExecutionWhite(t *testing.T) {
 	board.BlackPieces.Pawns = D5
 	board.EnPassant = 43 // d6
 	// Crear movimiento e5xd6 (en passant)
-	move := board.NewMove(MoveCapture, E5, D6)
+	move := board.NewMove(MoveCapture, E5, D6, Pawn)
 	// Marcar que el tablero tenía EnPassant previo
 	move.EnPassant = 0 // Después del movimiento se limpia
-	board.MovePiece(move, true, Pawn)
+	board.MovePiece(move, true)
 	// Peón negro en d5 debería haber sido capturado
 	assert.Assert(t, board.BlackPieces.Pawns&D5 == 0, "Black pawn on d5 should be captured via en passant")
 }
@@ -361,8 +361,8 @@ func TestEnPassantExecutionBlack(t *testing.T) {
 	board.BlackPieces.Pawns = D4
 	board.WhitePieces.Pawns = E4
 	board.EnPassant = 20 // e3
-	move := board.NewMove(MoveCapture, D4, E3)
-	board.MovePiece(move, false, Pawn)
+	move := board.NewMove(MoveCapture, D4, E3, Pawn)
+	board.MovePiece(move, false)
 	assert.Assert(t, board.WhitePieces.Pawns&E4 == 0, "White pawn on e4 should be captured via en passant")
 }
 

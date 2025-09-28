@@ -8,6 +8,15 @@ import (
 func main() {
 
 	board := m.NewBoard()
+	board.SetFen("r3k1nr/ppp2ppp/8/4p1B1/3Nq3/6P1/PP1QBP1P/R3K2R b KQkq - 0 1")
+	legalMoves := board.GetLegalMoves()
+	fmt.Println(legalMoves.ToString(true))
+	// m, bestScore := board.GetBestMove(2, true)
+	// fmt.Println(m.ToString(), bestScore)
+	mseq, bestScore := board.GetBestLine(5, false)
+	fmt.Println(mseq.ToString(false), bestScore)
+	return
+
 	// board.WhiteToMove = true
 	// board.MovePiece(board.NewMove(m.MoveNormal, m.E2, m.E4), true, m.Pawn)
 	// board.MovePiece(board.NewMove(m.MoveNormal, m.D7, m.D5), false, m.Pawn)
@@ -20,10 +29,4 @@ func main() {
 	fmt.Println(board.ToString())
 	return
 
-	res := m.Perft(board, 2)
-	fmt.Println("Perft results at depth 2:")
-	fmt.Printf("Nodes: %d\n", res.Nodes)
-	fmt.Printf("Captures: %d\n", res.Captures)
-	fmt.Printf("En Passants: %d\n", res.EnPassants)
-	fmt.Printf("Checks: %d\n", res.Checks)
 }

@@ -38,21 +38,10 @@ func (b *Board) Perft(depth int, start bool) PerftResult {
 				state := b.perftMakeMove(m)
 				// Tras hacer el movimiento, WhiteToMove indica el lado que debe responder.
 				// Si el rey de ese lado está siendo atacado, el movimiento ha dado jaque.
-				var kingBB uint64
-				kingIsWhite := b.WhiteToMove // color del rey potencialmente en jaque
-				if kingIsWhite {
-					kingBB = b.WhitePieces.King
-				} else {
-					kingBB = b.BlackPieces.King
+				if b.IsKingInCheck(b.WhiteToMove) {
+					res.Checks++
 				}
-				if kingBB != 0 { // seguridad
-					kingSq := uint8(bits.TrailingZeros64(kingBB))
-					row := int8(kingSq / 8)
-					col := int8(kingSq % 8)
-					if b.SquareAttacked(row, col, kingIsWhite) {
-						res.Checks++
-					}
-				}
+				// }
 				b.unmakeMove(state)
 
 				// Detectar promociones
@@ -156,22 +145,15 @@ func (b *Board) perftMakeMove(m Move) moveState {
 			if isWhite { // capture black pawn behind
 				capturedPiece = Pawn
 				capturedIsWhite = false
-				toBehind := toBB >> 8
-				b.CapturePiece(toBehind, false)
 			} else {
 				capturedPiece = Pawn
 				capturedIsWhite = true
-				toBehind := toBB << 8
-				b.CapturePiece(toBehind, true)
 			}
 		}
 	}
-	if capturedPiece != 0 && (b.AllPieces()&toBB) != 0 { // normal capture remove directly
-		b.CapturePiece(toBB, capturedIsWhite)
-	}
 
 	// Move the piece
-	b.MovePiece(m, isWhite, piece)
+	b.MovePiece(m, isWhite)
 
 	st.captured = capturedPiece
 	st.capturedIsWhite = capturedIsWhite
@@ -196,27 +178,17 @@ func (b *Board) isMoveLegal(m Move) bool {
 	var king uint64
 	if st.whiteToMove { // white moved
 		king = copy.WhitePieces.King
-		// if kingBB == 0 { // should not happen
-		// 	// b.unmakeMove(st)
-		// 	return false
-		// }
 		kingSq := uint8(bits.TrailingZeros64(king))
 		row := int8(kingSq / 8)
 		col := int8(kingSq % 8)
 		inCheck := copy.SquareAttacked(row, col, true)
-		// b.unmakeMove(st)
 		return !inCheck
 	} else { // black moved
 		king = copy.BlackPieces.King
-		// if kingBB == 0 { // should not happen
-		// 	// b.unmakeMove(st)
-		// 	return false
-		// }
 		kingSq := uint8(bits.TrailingZeros64(king))
 		row := int8(kingSq / 8)
 		col := int8(kingSq % 8)
 		inCheck := copy.SquareAttacked(row, col, false)
-		// b.unmakeMove(st)
 		return !inCheck
 	}
 }

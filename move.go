@@ -153,6 +153,7 @@ const (
 type Move struct {
 	From      uint8
 	To        uint8
+	Piece     Piece
 	Type      MoveType
 	Castling  CastleRights
 	EnPassant uint8
