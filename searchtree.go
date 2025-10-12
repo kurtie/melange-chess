@@ -101,7 +101,7 @@ func (n *SearchNode) ToString() string {
 	return ret
 }
 
-func (b *Board) GenerateSearchTree(depth int, isWhite bool) *SearchNode {
+func (b *Board) GenerateSearchTree(depth int) *SearchNode {
 	totalNodes = 1
 	root := NewSearchNode(nil, Move{})
 	var generate func(node *SearchNode, isWhite bool, depth int, board *Board)
@@ -131,20 +131,20 @@ func (b *Board) GenerateSearchTree(depth int, isWhite bool) *SearchNode {
 			node.Score = node.Children[0].Score
 		}
 	}
-	generate(root, isWhite, depth, b)
+	generate(root, b.WhiteToMove, depth, b)
 	return root
 }
 
-func (b *Board) GetBestMove(depth int, isWhite bool) (bestMove *Move, bestScore int) {
-	root := b.GenerateSearchTree(depth, isWhite)
+func (b *Board) GetBestMove(depth int) (bestMove *Move, bestScore int) {
+	root := b.GenerateSearchTree(depth)
 	if len(root.Children) == 0 {
 		return nil, 0 // No legal moves
 	}
 	return root.GetBestMove(), root.Children[0].Score
 }
 
-func (b *Board) GetBestLine(depth int, isWhite bool) (bestMoves MoveList, bestScore int) {
-	tree := b.GenerateSearchTree(depth, isWhite)
+func (b *Board) GetBestLine(depth int) (bestMoves MoveList, bestScore int) {
+	tree := b.GenerateSearchTree(depth)
 	fmt.Println(tree.ToString())
 	if len(tree.Children) == 0 {
 		return nil, 0 // No legal moves

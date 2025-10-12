@@ -8,7 +8,7 @@ import (
 
 func TestSearch(t *testing.T) {
 	board := NewBoard()
-	root := board.GenerateSearchTree(2, true)
+	root := board.GenerateSearchTree(2)
 	assert.Assert(t, root != nil, "Search tree root should not be nil")
 	assert.Assert(t, len(root.Children) > 0, "Root should have children")
 	assert.Assert(t, !root.IsLeaf(), "Root should not be a leaf")
