@@ -1,4 +1,6 @@
-package muabdib
+// UCI protocol specification: https://gist.github.com/DOBRO/2592c6dad754ba67e6dcaec8c90165bf
+
+package melange
 
 import (
 	"fmt"
@@ -38,7 +40,7 @@ func ProcessUciCommand(command string) bool {
 			return true
 		case "uci":
 			// Use fmt.Println for proper newline handling
-			fmt.Println("id name Muabdib v0.1")
+			fmt.Println("id name Melange v0.1")
 			fmt.Println("id author Jose R. Cabanes")
 			fmt.Println("uciok")
 		case "ucinewgame":

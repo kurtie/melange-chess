@@ -1,4 +1,4 @@
-module zentense/muabdib
+module zentense/melange
 
 go 1.24.6
 

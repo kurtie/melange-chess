@@ -4,16 +4,16 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	muabdib "zentense/muabdib"
+	melange "zentense/melange"
 )
 
 func main() {
 	// Main loop listens to standard input
-	fmt.Println("Muabdib v0.1")
+	fmt.Println("Melange v0.1")
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
 		line := scanner.Text()
-		if muabdib.ProcessUciCommand(line) {
+		if melange.ProcessUciCommand(line) {
 			break
 		}
 	}
