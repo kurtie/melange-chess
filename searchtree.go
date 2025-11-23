@@ -11,6 +11,7 @@ type SearchNode struct {
 	Children []*SearchNode
 	Move     Move
 	Score    int
+	Depth    int // profundidad del nodo en el árbol de búsqueda
 }
 
 var totalNodes = 0
@@ -101,7 +102,10 @@ func (n *SearchNode) ToString() string {
 	return ret
 }
 
+var hashTable = map[uint64]*SearchNode{}
+
 func (b *Board) GenerateSearchTree(depth int) *SearchNode {
+	hashTable = map[uint64]*SearchNode{}
 	totalNodes = 1
 	root := NewSearchNode(nil, Move{})
 	var generate func(node *SearchNode, isWhite bool, depth int, board *Board)
@@ -114,13 +118,33 @@ func (b *Board) GenerateSearchTree(depth int) *SearchNode {
 		for _, move := range moves {
 			childBoard := board.Clone()
 			childBoard.MovePiece(move, board.WhiteToMove)
-			if !childBoard.IsKingInCheck(board.WhiteToMove) {
-				score := childBoard.Evaluate()
+			hash := childBoard.CalculateHash()
+			if existingNode, found := hashTable[hash]; found && existingNode.Depth >= depth-1 {
+				// n := existingNode
+				// moves := ""
+				// for n != nil {
+				// 	moves += " - " + n.Move.ToString()
+				// 	n = n.Parent
+				// }
+				// fmt.Println("Reusing existing node for move:", hash, move)
+
+				// Reuse existing node
 				childNode := node.AddChild(move)
-				childNode.Score = score
-				generate(childNode, !isWhite, depth-1, childBoard)
+				childNode.Children = existingNode.Children
+				childNode.Score = existingNode.Score
+				childNode.Depth = existingNode.Depth
 			} else {
-				// fmt.Printf("Depth %d, Move %s, WTM:%v\n", depth, move.ToString(), childBoard.WhiteToMove)
+				if !childBoard.IsKingInCheck(board.WhiteToMove) {
+					score := childBoard.Evaluate()
+					childNode := node.AddChild(move)
+					childNode.Depth = depth - 1
+					childNode.Score = score
+					hashTable[hash] = childNode
+					generate(childNode, !isWhite, depth-1, childBoard)
+				} else {
+					// TODO: handle checkmate/stalemate if needed
+					// fmt.Printf("Depth %d, Move %s, WTM:%v\n", depth, move.ToString(), childBoard.WhiteToMove)
+				}
 			}
 		}
 		if len(node.Children) > 1 {

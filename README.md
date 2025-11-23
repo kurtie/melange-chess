@@ -9,7 +9,8 @@ Melange Chess Engine is an open-source chess engine written in Go. This is my si
 - Negamax search tree
 - Evaluation function
 - UCI protocol
+- Zobrist hashing
 
 ## State
 
-Very early stage. Moves are correctly generated (including castilngs, *en passe* and promotions) and the evaluation function is very basic. UCI protocol implementation is very uncomplete but it is possible to play chess (at least with [nibbler](https://github.com/rooklift/nibbler))
+Early stage. Moves are correctly generated (including castilngs, *en passe* and promotions) and the evaluation function is  basic but with enough depth is able to play reasonably well. It does not now how to checkmate yet. UCI protocol implementation is very uncomplete but it is possible to play chess (at least with [nibbler](https://github.com/rooklift/nibbler))
